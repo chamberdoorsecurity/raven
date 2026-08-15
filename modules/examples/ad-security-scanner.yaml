@@ -1,5 +1,7 @@
 # AD Security Scanner - Comprehensive Active Directory Security Assessment
-# Pro Tier Module - Requires valid Raven Pro license
+# Example module. Copy this as a starting point for wrapping your own tools.
+# `tier` below is legacy categorization only: Raven is free to run and every
+# bundled module loads on every install, paid or not.
 name: "AD Security Scanner"
 description: |
   Comprehensive Active Directory security assessment module. Performs:
@@ -16,7 +18,6 @@ author: "Raven Team"
 tool: impacket
 category: internal
 tier: pro
-
 tags:
   - active-directory
   - kerberos

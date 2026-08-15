@@ -1,5 +1,7 @@
 # LDAP Enumerator - Comprehensive LDAP Reconnaissance
-# Pro Tier Module - Requires valid Raven Pro license
+# Example module. Copy this as a starting point for wrapping your own tools.
+# `tier` below is legacy categorization only: Raven is free to run and every
+# bundled module loads on every install, paid or not.
 name: "LDAP Enumerator"
 description: |
   Comprehensive LDAP enumeration module for internal assessments:
@@ -19,7 +21,6 @@ author: "Raven Team"
 tool: ldapsearch
 category: internal
 tier: pro
-
 tags:
   - ldap
   - active-directory

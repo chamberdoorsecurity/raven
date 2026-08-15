@@ -1,5 +1,7 @@
 # SMB Hunter - Comprehensive SMB Security Testing
-# Pro Tier Module - Requires valid Raven Pro license
+# Example module. Copy this as a starting point for wrapping your own tools.
+# `tier` below is legacy categorization only: Raven is free to run and every
+# bundled module loads on every install, paid or not.
 name: "SMB Hunter"
 description: |
   Comprehensive SMB security testing module for internal pentests:
@@ -17,7 +19,6 @@ author: "Raven Team"
 tool: crackmapexec
 category: internal
 tier: pro
-
 tags:
   - smb
   - windows
