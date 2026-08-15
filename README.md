@@ -3,7 +3,9 @@
 Pentest engagement framework. Runs your tools, keeps everything in one engagement database, writes the report.
 
 ```bash
-docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/chamberdoorsecurity/raven:latest
+docker run --rm -p 127.0.0.1:8080:8080 \
+  --cap-add=NET_RAW --cap-add=NET_ADMIN \
+  ghcr.io/chamberdoorsecurity/raven:latest
 ```
 
 Then <http://localhost:8080>. No account needed.
@@ -22,8 +24,12 @@ Then <http://localhost:8080>. No account needed.
 Docker, any platform:
 
 ```bash
-docker run --rm -p 127.0.0.1:8080:8080 ghcr.io/chamberdoorsecurity/raven:latest
+docker run --rm -p 127.0.0.1:8080:8080 \
+  --cap-add=NET_RAW --cap-add=NET_ADMIN \
+  ghcr.io/chamberdoorsecurity/raven:latest
 ```
+
+Both caps are needed to run nmap at all: its binary carries file capabilities (`cap_net_admin`, `cap_net_raw`), and the kernel refuses to exec it unless they are in the container's bounding set. Docker grants `NET_RAW` by default but not `NET_ADMIN`.
 
 On Linux, `--network host` instead of `-p` lets it scan your local network directly. That also exposes the dashboard on your interfaces, and there is no auth in single-user mode, so on a client site keep the loopback publish.
 
