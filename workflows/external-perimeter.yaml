@@ -1,0 +1,137 @@
+name: External Perimeter Assessment
+description: Complete external attack surface analysis
+enabled: true
+
+steps:
+  - name: subdomain_enum
+    module: subfinder
+    description: Comprehensive subdomain enumeration
+    params: {}
+
+  - name: ai_review_recon
+    type: ai_checkpoint
+    module: ""
+    description: AI reviews reconnaissance results and adjusts discovery plan
+    depends_on:
+      - subdomain_enum
+    prompt: >
+      Recon phase complete. Use get_engagement_status to review what was found
+      (subdomains, hosts, emails). Based on the results, should we adjust the
+      discovery phase? Consider skipping steps if no relevant targets were found,
+      or adding steps if unexpected services were discovered.
+
+  - name: port_scan_all
+    module: nmap
+    description: Full port scan with service detection
+    condition: hosts_found
+    depends_on:
+      - ai_review_recon
+    params:
+      scan_type: full
+      service_detection: true
+
+  - name: shodan_intelligence
+    module: shodan_host_scope
+    description: Gather external intelligence from Shodan
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: waf_detection
+    module: waf_detection
+    description: Identify perimeter defenses
+    condition: web_services_found
+    depends_on:
+      - port_scan_all
+    params: {}
+
+  - name: ssl_security_check
+    module: ssl_vuln_scan
+    description: Assess SSL/TLS security posture
+    condition: ssl_services_found
+    depends_on:
+      - port_scan_all
+    params: {}
+
+  - name: web_screenshots
+    module: gowitness
+    description: Visual reconnaissance of web assets
+    condition: web_services_found
+    depends_on:
+      - port_scan_all
+    params: {}
+
+  - name: directory_enum
+    module: ffuf
+    description: Discover exposed directories and files
+    condition: web_services_found
+    depends_on:
+      - waf_detection
+    params:
+      wordlist: common
+
+  - name: email_harvest
+    module: emailharvest_scope
+    description: Harvest employee email addresses
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: github_leaks
+    module: github_dork_scope
+    description: Search for leaked secrets on GitHub
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: wayback_analysis
+    module: wayback_scope
+    description: Analyze historical attack surface
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: ai_review_discovery
+    type: ai_checkpoint
+    module: ""
+    description: AI reviews discovery and enumeration results before vuln scanning
+    depends_on:
+      - directory_enum
+    prompt: >
+      Discovery and enumeration phases complete. Use get_engagement_status to review
+      hosts, ports, web services, and directory findings. Before starting vulnerability
+      scanning, should we adjust the plan? Consider the attack surface size and
+      prioritize high-value targets.
+
+  - name: vulnerability_scan
+    module: nuclei
+    description: Comprehensive vulnerability scanning
+    condition: web_services_found
+    depends_on:
+      - ai_review_discovery
+    params:
+      templates: all
+
+  - name: exploit_research
+    module: exploits
+    description: Research available exploits
+    condition: vulnerabilities_found
+    depends_on:
+      - vulnerability_scan
+    params: {}
+
+  - name: ai_final_review
+    type: ai_checkpoint
+    module: ""
+    description: AI provides final assessment summary and recommendations
+    depends_on:
+      - exploit_research
+      - vulnerability_scan
+    prompt: >
+      Assessment complete. Use get_engagement_status and get_findings to review all
+      results. Provide a final summary: key findings by severity, potential attack
+      paths, and prioritized remediation recommendations.

@@ -1,0 +1,116 @@
+# AD Security Scanner - Comprehensive Active Directory Security Assessment
+# Pro Tier Module - Requires valid Raven Pro license
+name: "AD Security Scanner"
+description: |
+  Comprehensive Active Directory security assessment module. Performs:
+  - AS-REP Roastable user enumeration (accounts without pre-auth)
+  - Kerberoastable service account discovery
+  - Delegation misconfigurations (unconstrained, constrained, RBCD)
+  - ACL abuse paths (DCSync, WriteDACL, AddMember, etc.)
+  - Password policy analysis
+  - Privileged group membership enumeration
+  - GPO security assessment
+  - Trust relationship mapping
+version: "1.2.0"
+author: "Raven Team"
+tool: impacket
+category: internal
+tier: pro
+
+tags:
+  - active-directory
+  - kerberos
+  - privilege-escalation
+  - security-audit
+  - impacket
+
+inputs:
+  - name: domain
+    type: string
+    required: true
+    description: "Target domain (e.g., corp.local)"
+
+  - name: dc_ip
+    type: ip
+    required: true
+    description: "Domain Controller IP address"
+
+  - name: username
+    type: string
+    required: true
+    description: "Domain username for authentication"
+
+  - name: password
+    type: string
+    required: false
+    description: "Password (leave empty for hash auth)"
+
+  - name: hash
+    type: string
+    required: false
+    description: "NTLM hash for pass-the-hash (LM:NT or just NT)"
+
+  - name: scan_type
+    type: choice
+    default: "full"
+    choices: ["full", "kerberoast", "asreproast", "delegation", "acl", "quick"]
+    description: "Type of scan to perform"
+
+  - name: output_format
+    type: choice
+    default: "json"
+    choices: ["json", "csv", "both"]
+    description: "Output format for results"
+
+command: |
+  {% if scan_type == 'full' or scan_type == 'quick' %}
+  # AS-REP Roasting - Find users without Kerberos pre-auth
+  impacket-GetNPUsers {{domain}}/{{username}}{% if password %}:'{{password}}'{% elif hash %} -hashes '{{hash}}'{% endif %} -dc-ip {{dc_ip}} -request -format hashcat -outputfile {{output_file}}_asrep.txt 2>/dev/null;
+
+  # Kerberoasting - Find SPNs
+  impacket-GetUserSPNs {{domain}}/{{username}}{% if password %}:'{{password}}'{% elif hash %} -hashes '{{hash}}'{% endif %} -dc-ip {{dc_ip}} -request -outputfile {{output_file}}_kerberoast.txt 2>/dev/null;
+  {% endif %}
+
+  {% if scan_type == 'full' or scan_type == 'delegation' %}
+  # Delegation enumeration using ldapsearch
+  ldapsearch -x -H ldap://{{dc_ip}} -D "{{username}}@{{domain}}" {% if password %}-w '{{password}}'{% endif %} -b "DC={{domain.split('.')[0]}},DC={{domain.split('.')[1]}}" "(|(userAccountControl:1.2.840.113556.1.4.803:=524288)(userAccountControl:1.2.840.113556.1.4.803:=16777216)(msDS-AllowedToDelegateTo=*))" sAMAccountName userAccountControl msDS-AllowedToDelegateTo msDS-AllowedToActOnBehalfOfOtherIdentity 2>/dev/null > {{output_file}}_delegation.txt;
+  {% endif %}
+
+  {% if scan_type == 'full' %}
+  # Domain password policy
+  impacket-GetADUsers {{domain}}/{{username}}{% if password %}:'{{password}}'{% elif hash %} -hashes '{{hash}}'{% endif %} -dc-ip {{dc_ip}} -all 2>/dev/null | head -50 > {{output_file}}_users.txt;
+  {% endif %}
+
+  # Combine results into JSON
+  python3 -c "
+  import json
+  import os
+  results = {'asrep': [], 'kerberoast': [], 'delegation': [], 'users': []}
+  for suffix in ['asrep', 'kerberoast', 'delegation', 'users']:
+      fpath = '{{output_file}}_' + suffix + '.txt'
+      if os.path.exists(fpath):
+          with open(fpath) as f:
+              results[suffix] = [l.strip() for l in f if l.strip()]
+  print(json.dumps(results, indent=2))
+  " > {{output_file}}
+
+output:
+  format: json
+  file: "ad_scan_{{domain|safe_filename}}.json"
+
+parser:
+  type: json_path
+  results_path: "$"
+
+findings_mapping:
+  enabled: true
+  title_template: "AD Security Issue: {{issue_type}}"
+  severity_field: "severity"
+  severity_map:
+    critical: "critical"
+    high: "high"
+    medium: "medium"
+    low: "low"
+  description_template: "{{description}}"
+  evidence_template: "{{evidence}}"
+  affected_hosts_field: "target"

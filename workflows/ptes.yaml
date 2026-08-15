@@ -1,0 +1,232 @@
+name: "PTES - Penetration Testing Execution Standard"
+description: "Industry-standard penetration testing methodology covering all phases from pre-engagement to reporting"
+version: "1.0"
+author: "Raven Framework"
+category: "methodology"
+
+steps:
+  # Phase 1: Pre-Engagement (Scoping)
+  # Note: Pre-engagement is manual - scope should already be defined
+
+  # Phase 2: Intelligence Gathering (Passive & Active Reconnaissance)
+
+  ## Passive Reconnaissance
+  - name: "OSINT - Search Engine Discovery"
+    description: "Passive intelligence gathering using search engines (PTES Section 3.2.1)"
+    module: "google_dorks"
+    params:
+      queries:
+        - "site:TARGET"
+        - "site:TARGET filetype:pdf | filetype:doc | filetype:xls"
+    skip_if_no_tool: true
+
+  - name: "OSINT - Breach Data Collection"
+    description: "Search for leaked credentials and sensitive data (PTES Section 3.2.3)"
+    module: "dehashed"
+    skip_if_no_api_key: true
+
+  - name: "OSINT - Code Repository Analysis"
+    description: "Search GitHub for exposed secrets and code (PTES Section 3.2.4)"
+    module: "github_dork_scope"
+    skip_if_no_api_key: true
+
+  - name: "OSINT - Certificate Transparency Logs"
+    description: "Discover subdomains via CT logs (PTES Section 3.2.5)"
+    module: "crtsh_scope"
+    params:
+      method: "crt.sh"
+
+  ## Active Reconnaissance
+  - name: "Active Subdomain Enumeration"
+    description: "Actively enumerate subdomains and related infrastructure (PTES Section 3.3.1)"
+    module: "subfinder"
+    params:
+      method: "all"
+
+  - name: "Network Host Discovery"
+    description: "Discover live hosts on the network (PTES Section 3.3.2)"
+    module: "nmap"
+    params:
+      scan_type: "ping_sweep"
+      timing: "T4"
+
+  - name: "Service Identification"
+    description: "Identify running services and versions (PTES Section 3.3.3)"
+    module: "nmap"
+    params:
+      scan_type: "service_detection"
+      timing: "T4"
+      service_detection: true
+    depends_on: ["Network Host Discovery"]
+
+  - name: "Operating System Detection"
+    description: "Fingerprint operating systems (PTES Section 3.3.4)"
+    module: "nmap"
+    params:
+      scan_type: "os_detection"
+      timing: "T4"
+      os_detection: true
+    depends_on: ["Network Host Discovery"]
+
+  # Phase 3: Vulnerability Analysis
+
+  - name: "Network Vulnerability Scanning"
+    description: "Automated vulnerability scanning (PTES Section 4.1)"
+    module: "nuclei"
+    params:
+      templates: "cves,vulnerabilities"
+      severity: "critical,high,medium"
+    depends_on: ["Service Identification"]
+
+  - name: "SSL/TLS Security Assessment"
+    description: "Assess SSL/TLS configuration and vulnerabilities (PTES Section 4.2)"
+    module: "ssl_enum"
+    depends_on: ["Active Subdomain Enumeration"]
+
+  - name: "Web Application Fingerprinting"
+    description: "Identify web technologies and frameworks (PTES Section 4.3)"
+    module: "nuclei"
+    params:
+      templates: "technologies"
+    depends_on: ["Active Subdomain Enumeration"]
+
+  - name: "Default Credentials Testing"
+    description: "Test for default and common credentials (PTES Section 4.4)"
+    module: "nuclei"
+    params:
+      templates: "default-logins"
+    depends_on: ["Service Identification"]
+
+  - name: "Common Misconfigurations"
+    description: "Scan for common security misconfigurations (PTES Section 4.5)"
+    module: "nuclei"
+    params:
+      templates: "misconfigurations,exposures"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 4: Exploitation (Discovery Phase)
+
+  - name: "Directory and File Discovery"
+    description: "Discover hidden directories and files (PTES Section 5.1)"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt"
+      extensions: "php,asp,aspx,jsp,html,js,json,xml,txt,bak,old,conf"
+      threads: 50
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "Parameter and Endpoint Discovery"
+    description: "Discover API endpoints and parameters (PTES Section 5.2)"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt"
+      extensions: "json"
+    depends_on: ["Web Application Fingerprinting"]
+    skip_if_no_tool: true
+
+  ## Exploitation Attack Vectors
+  - name: "SQL Injection Detection"
+    description: "Test for SQL injection vulnerabilities (PTES Section 5.3.1)"
+    module: "nuclei"
+    params:
+      templates: "sqli"
+    depends_on: ["Directory and File Discovery"]
+
+  - name: "Cross-Site Scripting (XSS) Detection"
+    description: "Test for XSS vulnerabilities (PTES Section 5.3.2)"
+    module: "nuclei"
+    params:
+      templates: "xss"
+    depends_on: ["Directory and File Discovery"]
+
+  - name: "Remote Code Execution Testing"
+    description: "Test for RCE and command injection (PTES Section 5.3.3)"
+    module: "nuclei"
+    params:
+      templates: "rce,injection"
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "File Inclusion Testing"
+    description: "Test for LFI/RFI vulnerabilities (PTES Section 5.3.4)"
+    module: "nuclei"
+    params:
+      templates: "lfi,file"
+    depends_on: ["Directory and File Discovery"]
+
+  - name: "Authentication Bypass Testing"
+    description: "Test authentication mechanisms for bypass (PTES Section 5.3.5)"
+    module: "nuclei"
+    params:
+      templates: "auth-bypass"
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "Server-Side Request Forgery (SSRF)"
+    description: "Test for SSRF vulnerabilities (PTES Section 5.3.6)"
+    module: "nuclei"
+    params:
+      templates: "ssrf"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 5: Post-Exploitation
+  # Note: Post-exploitation is manual and situation-dependent
+
+  # Phase 6: Reporting (Evidence Collection)
+
+  - name: "Screenshot Evidence Collection"
+    description: "Capture screenshots of all services for reporting (PTES Section 7.1)"
+    module: "gowitness"
+    depends_on: ["Active Subdomain Enumeration"]
+
+  - name: "WAF Detection"
+    description: "Identify WAF/IPS/IDS for reporting (PTES Section 7.2)"
+    module: "waf_detection"
+    depends_on: ["Active Subdomain Enumeration"]
+    skip_if_no_tool: true
+
+# Execution Options
+options:
+  parallel_execution: true
+  max_parallel_steps: 5
+  stop_on_critical: false
+  estimated_time: "180-240 minutes"
+
+# Success Criteria
+success_criteria:
+  - "All PTES phases completed (Intelligence Gathering through Evidence Collection)"
+  - "Comprehensive vulnerability assessment performed"
+  - "Attack surface fully mapped"
+  - "Evidence collected for reporting"
+
+# Required Tools
+required_tools:
+  - "nmap"
+  - "nuclei"
+  - "sublist3r"
+  - "sslscan"
+  - "feroxbuster"
+  - "gowitness"
+
+optional_tools:
+  - "dehashed"
+  - "github"
+  - "wafw00f"
+
+# PTES Methodology Phases Coverage
+methodology_coverage:
+  pre_engagement: "Manual - Scope defined before workflow"
+  intelligence_gathering:
+    passive: "OSINT, Breach Data, GitHub, CT Logs"
+    active: "Subdomain Enum, Service Discovery, Fingerprinting"
+  threat_modeling: "Manual - Based on discovered vulnerabilities"
+  vulnerability_analysis: "Automated scanning, SSL/TLS, Misconfigurations"
+  exploitation: "Automated discovery, Common attack vectors"
+  post_exploitation: "Manual - Situation dependent"
+  reporting: "Evidence collection via screenshots and WAF detection"
+
+# Tags
+tags:
+  - "ptes"
+  - "comprehensive"
+  - "methodology"
+  - "industry-standard"
+  - "full-scope"

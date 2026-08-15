@@ -1,0 +1,272 @@
+name: "API Security Testing"
+description: "Comprehensive API security assessment following OWASP API Security Top 10"
+version: "1.0"
+author: "Raven Framework"
+category: "methodology"
+
+steps:
+  # Phase 1: API Discovery
+
+  - name: "API Endpoint Discovery"
+    description: "Discover all API endpoints and paths"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt"
+      extensions: "json"
+      threads: 50
+
+  - name: "GraphQL Endpoint Discovery"
+    description: "Discover GraphQL endpoints and schemas"
+    module: "nuclei"
+    params:
+      templates: "graphql"
+    skip_if_no_tool: true
+
+  - name: "Subdomain Enumeration"
+    description: "Find all API subdomains (api., rest., graphql., etc.)"
+    module: "subfinder"
+    params:
+      method: "all"
+
+  - name: "Technology Fingerprinting"
+    description: "Identify API frameworks and technologies"
+    module: "nuclei"
+    params:
+      templates: "technologies"
+    depends_on: ["Subdomain Enumeration"]
+
+  # Phase 2: OWASP API Security Top 10 Testing
+
+  ## API1:2023 - Broken Object Level Authorization (BOLA/IDOR)
+  - name: "API1 - BOLA/IDOR Testing"
+    description: "Test for Broken Object Level Authorization vulnerabilities"
+    module: "nuclei"
+    params:
+      templates: "idor"
+    depends_on: ["API Endpoint Discovery"]
+    skip_if_no_tool: true
+
+  ## API2:2023 - Broken Authentication
+  - name: "API2 - Authentication Bypass Testing"
+    description: "Test for authentication bypass and JWT vulnerabilities"
+    module: "nuclei"
+    params:
+      templates: "auth-bypass,jwt"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "API2 - Default Credentials Testing"
+    description: "Test for default and weak API credentials"
+    module: "nuclei"
+    params:
+      templates: "default-logins"
+    depends_on: ["Technology Fingerprinting"]
+
+  ## API3:2023 - Broken Object Property Level Authorization
+  - name: "API3 - Mass Assignment Testing"
+    description: "Test for mass assignment and excessive data exposure"
+    module: "nuclei"
+    params:
+      templates: "generic-detections"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API4:2023 - Unrestricted Resource Consumption
+  - name: "API4 - Rate Limiting Testing"
+    description: "Test for lack of rate limiting and resource exhaustion"
+    module: "nuclei"
+    params:
+      templates: "misconfiguration"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API5:2023 - Broken Function Level Authorization
+  - name: "API5 - Function Level Authorization Testing"
+    description: "Test for function-level authorization bypass"
+    module: "nuclei"
+    params:
+      templates: "auth-bypass"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API6:2023 - Unrestricted Access to Sensitive Business Flows
+  - name: "API6 - Business Logic Testing"
+    description: "Test for business logic flaws in workflows"
+    module: "nuclei"
+    params:
+      templates: "workflows"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API7:2023 - Server Side Request Forgery (SSRF)
+  - name: "API7 - SSRF Testing"
+    description: "Test for Server-Side Request Forgery vulnerabilities"
+    module: "nuclei"
+    params:
+      templates: "ssrf"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API8:2023 - Security Misconfiguration
+  - name: "API8 - Security Misconfiguration Testing"
+    description: "Test for security misconfigurations and verbose errors"
+    module: "nuclei"
+    params:
+      templates: "misconfigurations,exposures"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "API8 - CORS Misconfiguration Testing"
+    description: "Test for CORS misconfigurations"
+    module: "nuclei"
+    params:
+      templates: "misconfiguration"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API9:2023 - Improper Inventory Management
+  - name: "API9 - Old API Version Discovery"
+    description: "Discover old/deprecated API versions"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/api/api-seen-in-wild.txt"
+      extensions: ""
+    depends_on: ["API Endpoint Discovery"]
+
+  - name: "API9 - API Documentation Exposure"
+    description: "Find exposed API documentation and Swagger/OpenAPI specs"
+    module: "nuclei"
+    params:
+      templates: "exposures"
+    depends_on: ["API Endpoint Discovery"]
+
+  ## API10:2023 - Unsafe Consumption of APIs
+  - name: "API10 - Third-Party Integration Testing"
+    description: "Test for unsafe consumption of third-party APIs"
+    module: "nuclei"
+    params:
+      templates: "cves"
+    depends_on: ["Technology Fingerprinting"]
+
+  # Phase 3: Common API Vulnerabilities
+
+  - name: "SQL Injection in API Parameters"
+    description: "Test API parameters for SQL injection"
+    module: "nuclei"
+    params:
+      templates: "sqli"
+    depends_on: ["API Endpoint Discovery"]
+
+  - name: "NoSQL Injection Testing"
+    description: "Test for NoSQL injection in JSON/MongoDB APIs"
+    module: "nuclei"
+    params:
+      templates: "injection"
+    depends_on: ["API Endpoint Discovery"]
+
+  - name: "XML External Entity (XXE) Testing"
+    description: "Test for XXE in XML-based APIs"
+    module: "nuclei"
+    params:
+      templates: "xxe"
+    depends_on: ["API Endpoint Discovery"]
+
+  - name: "Command Injection Testing"
+    description: "Test for OS command injection in API endpoints"
+    module: "nuclei"
+    params:
+      templates: "rce,injection"
+    depends_on: ["API Endpoint Discovery"]
+
+  # Phase 4: API-Specific Security Controls
+
+  - name: "API Key Exposure Testing"
+    description: "Test for exposed API keys in responses and documentation"
+    module: "nuclei"
+    params:
+      templates: "exposures,keys"
+    depends_on: ["API Endpoint Discovery"]
+
+  - name: "SSL/TLS Configuration Testing"
+    description: "Test API SSL/TLS configuration and certificates"
+    module: "ssl_enum"
+    depends_on: ["Subdomain Enumeration"]
+
+  - name: "HTTP Methods Testing"
+    description: "Test for dangerous HTTP methods (PUT, DELETE, PATCH)"
+    module: "nuclei"
+    params:
+      templates: "http-methods"
+    depends_on: ["API Endpoint Discovery"]
+
+  # Phase 5: Evidence Collection
+
+  - name: "Screenshot Evidence Collection"
+    description: "Capture screenshots of API documentation and interfaces"
+    module: "gowitness"
+    depends_on: ["Subdomain Enumeration"]
+
+  - name: "WAF Detection"
+    description: "Identify WAF/API Gateway protection"
+    module: "waf_detection"
+    depends_on: ["Subdomain Enumeration"]
+    skip_if_no_tool: true
+
+# Execution Options
+options:
+  parallel_execution: true
+  max_parallel_steps: 5
+  stop_on_critical: false
+  estimated_time: "90-120 minutes"
+
+# OWASP API Security Top 10 2023 Coverage
+owasp_api_top10_coverage:
+  API1_2023: "Broken Object Level Authorization - IDOR testing"
+  API2_2023: "Broken Authentication - Auth bypass, JWT, default creds"
+  API3_2023: "Broken Object Property Level Authorization - Mass assignment"
+  API4_2023: "Unrestricted Resource Consumption - Rate limiting"
+  API5_2023: "Broken Function Level Authorization - Function-level auth"
+  API6_2023: "Unrestricted Access to Sensitive Business Flows - Business logic"
+  API7_2023: "Server Side Request Forgery - SSRF testing"
+  API8_2023: "Security Misconfiguration - Misconfigs, CORS, verbose errors"
+  API9_2023: "Improper Inventory Management - Old versions, exposed docs"
+  API10_2023: "Unsafe Consumption of APIs - Third-party integration vulns"
+
+# Success Criteria
+success_criteria:
+  - "All API endpoints discovered and documented"
+  - "OWASP API Security Top 10 tested"
+  - "Common API vulnerabilities assessed"
+  - "API documentation and versions catalogued"
+
+# Required Tools
+required_tools:
+  - "nuclei"
+  - "feroxbuster"
+  - "sublist3r"
+  - "sslscan"
+  - "gowitness"
+
+optional_tools:
+  - "wafw00f"
+
+# API Testing Best Practices
+best_practices:
+  - "Test both authenticated and unauthenticated endpoints"
+  - "Try different HTTP methods (GET, POST, PUT, DELETE, PATCH)"
+  - "Test parameter pollution and mass assignment"
+  - "Look for version numbers in responses and URLs"
+  - "Check for GraphQL introspection enabled"
+  - "Test rate limiting on all critical endpoints"
+  - "Verify proper authentication on all sensitive operations"
+
+# Common API Endpoints to Test
+common_api_paths:
+  - "/api/v1/"
+  - "/api/v2/"
+  - "/rest/"
+  - "/graphql"
+  - "/swagger.json"
+  - "/openapi.json"
+  - "/api-docs"
+  - "/docs"
+
+# Tags
+tags:
+  - "api-security"
+  - "owasp-api-top10"
+  - "rest-api"
+  - "graphql"
+  - "comprehensive"

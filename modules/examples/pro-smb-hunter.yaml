@@ -1,0 +1,193 @@
+# SMB Hunter - Comprehensive SMB Security Testing
+# Pro Tier Module - Requires valid Raven Pro license
+name: "SMB Hunter"
+description: |
+  Comprehensive SMB security testing module for internal pentests:
+  - Null session enumeration
+  - Guest access testing
+  - Share enumeration and permission analysis
+  - Sensitive file discovery (passwords, configs, keys)
+  - SMB signing verification
+  - User and group enumeration
+  - Password policy extraction
+  - EternalBlue (MS17-010) vulnerability check
+  - PrintNightmare check
+version: "1.3.0"
+author: "Raven Team"
+tool: crackmapexec
+category: internal
+tier: pro
+
+tags:
+  - smb
+  - windows
+  - enumeration
+  - credential-theft
+  - internal
+
+inputs:
+  - name: target
+    type: string
+    required: true
+    description: "Target IP, hostname, or CIDR range"
+
+  - name: username
+    type: string
+    default: ""
+    description: "Username for authenticated enumeration (empty for null session)"
+
+  - name: password
+    type: string
+    default: ""
+    description: "Password for authentication"
+
+  - name: hash
+    type: string
+    default: ""
+    description: "NTLM hash for pass-the-hash (LM:NT format)"
+
+  - name: domain
+    type: string
+    default: ""
+    description: "Domain for authentication"
+
+  - name: scan_mode
+    type: choice
+    default: "full"
+    choices: ["full", "null-session", "shares", "users", "vulns", "spider"]
+    description: "Type of scan to perform"
+
+  - name: spider_depth
+    type: number
+    default: 2
+    description: "Depth for share spidering (spider mode)"
+
+  - name: sensitive_patterns
+    type: string
+    default: "password,passwd,credentials,secret,private,key,token,api"
+    description: "Comma-separated patterns for sensitive file search"
+
+command: |
+  # Build auth string
+  {% if username and password %}
+  AUTH="-u '{{username}}' -p '{{password}}' {% if domain %}-d '{{domain}}'{% endif %}"
+  {% elif username and hash %}
+  AUTH="-u '{{username}}' -H '{{hash}}' {% if domain %}-d '{{domain}}'{% endif %}"
+  {% else %}
+  AUTH="-u '' -p ''"
+  {% endif %}
+
+  echo "[*] SMB Hunter starting against {{target}}";
+
+  {% if scan_mode == 'null-session' or scan_mode == 'full' %}
+  # Test null session / guest access
+  echo "[*] Testing null session and guest access";
+  crackmapexec smb {{target}} -u '' -p '' --shares 2>/dev/null | tee {{output_file}}_null.txt;
+  crackmapexec smb {{target}} -u 'guest' -p '' --shares 2>/dev/null | tee -a {{output_file}}_null.txt;
+  {% endif %}
+
+  {% if scan_mode == 'shares' or scan_mode == 'full' %}
+  # Share enumeration
+  echo "[*] Enumerating shares";
+  crackmapexec smb {{target}} $AUTH --shares 2>/dev/null | tee {{output_file}}_shares.txt;
+
+  # Check for readable shares
+  echo "[*] Testing share access";
+  smbclient -L //{{target}} -N 2>/dev/null | tee -a {{output_file}}_shares.txt;
+  {% endif %}
+
+  {% if scan_mode == 'users' or scan_mode == 'full' %}
+  # User enumeration
+  echo "[*] Enumerating users";
+  crackmapexec smb {{target}} $AUTH --users 2>/dev/null | tee {{output_file}}_users.txt;
+
+  # Group enumeration
+  echo "[*] Enumerating groups";
+  crackmapexec smb {{target}} $AUTH --groups 2>/dev/null | tee {{output_file}}_groups.txt;
+
+  # Logged on users
+  echo "[*] Checking logged on users";
+  crackmapexec smb {{target}} $AUTH --loggedon-users 2>/dev/null | tee {{output_file}}_loggedon.txt;
+
+  # RID brute force
+  echo "[*] RID cycling";
+  crackmapexec smb {{target}} $AUTH --rid-brute 2>/dev/null | tee {{output_file}}_rid.txt;
+
+  # Password policy
+  echo "[*] Getting password policy";
+  crackmapexec smb {{target}} $AUTH --pass-pol 2>/dev/null | tee {{output_file}}_passpol.txt;
+  {% endif %}
+
+  {% if scan_mode == 'vulns' or scan_mode == 'full' %}
+  # Vulnerability checks
+  echo "[*] Checking SMB signing";
+  crackmapexec smb {{target}} --gen-relay-list {{output_file}}_nosigning.txt 2>/dev/null;
+
+  # MS17-010 (EternalBlue)
+  echo "[*] Checking MS17-010";
+  crackmapexec smb {{target}} -M ms17-010 2>/dev/null | tee {{output_file}}_ms17010.txt;
+
+  # PrintNightmare
+  echo "[*] Checking PrintNightmare";
+  crackmapexec smb {{target}} -M printnightmare 2>/dev/null | tee {{output_file}}_printnightmare.txt;
+
+  # SMBGhost
+  echo "[*] Checking SMBGhost";
+  crackmapexec smb {{target}} -M smbghost 2>/dev/null | tee {{output_file}}_smbghost.txt;
+
+  # PetitPotam
+  echo "[*] Checking PetitPotam";
+  crackmapexec smb {{target}} -M petitpotam 2>/dev/null | tee {{output_file}}_petitpotam.txt;
+  {% endif %}
+
+  {% if scan_mode == 'spider' or scan_mode == 'full' %}
+  # Spider shares for sensitive files
+  echo "[*] Spidering shares for sensitive files";
+  crackmapexec smb {{target}} $AUTH --spider . --depth {{spider_depth}} --pattern "{{sensitive_patterns}}" 2>/dev/null | tee {{output_file}}_spider.txt;
+  {% endif %}
+
+  # Combine results into JSON
+  python3 -c "
+  import json, os, glob
+  results = {'hosts': [], 'findings': []}
+  for f in glob.glob('{{output_file}}_*.txt'):
+      key = f.replace('{{output_file}}_', '').replace('.txt', '')
+      with open(f) as fp:
+          content = fp.read().strip()
+          if content:
+              results[key] = content.split('\n')
+              # Flag specific findings
+              if 'Pwn3d' in content:
+                  results['findings'].append({'type': 'admin_access', 'severity': 'critical'})
+              if 'MS17-010' in content and 'VULNERABLE' in content:
+                  results['findings'].append({'type': 'ms17-010', 'severity': 'critical'})
+              if 'SMB signing' in content and 'not required' in content:
+                  results['findings'].append({'type': 'smb_signing_disabled', 'severity': 'high'})
+  with open('{{output_file}}', 'w') as out:
+      json.dump(results, out, indent=2)
+  "
+
+output:
+  format: json
+  file: "smb_{{target|safe_filename}}.json"
+
+parser:
+  type: json_path
+  results_path: "$.findings[*]"
+
+findings_mapping:
+  enabled: true
+  title_template: "SMB {{type}} on {{target}}"
+  severity_field: "severity"
+  severity_map:
+    critical: "critical"
+    high: "high"
+    medium: "medium"
+    low: "low"
+  description_template: |
+    SMB security issue detected on target host.
+    Type: {{type}}
+    Details: {{details}}
+  evidence_template: "{{evidence}}"
+  affected_hosts_field: "host"
+  affected_ports_field: "port"

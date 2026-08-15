@@ -1,0 +1,36 @@
+# Shipped SEED workflow (read-only template) -- T14.
+# Serialized from the built-in Python Workflow of the same id; the id is a
+# protected seed (workflow_validate.PROTECTED_SEED_IDS) so a custom save can
+# never shadow it. To customize, clone to your engagement (Duplicate) and
+# edit the copy -- never edit this file. The Python built-in stays as a
+# belt-and-suspenders fallback for this release.
+id: osint_recon
+name: OSINT Reconnaissance
+description: 'Passive information gathering: subdomains → certificates → emails → shodan → breach data'
+category: osint
+template: true
+version: 1
+steps:
+- name: Subdomain Enumeration
+  module: sublist3r_scope
+  description: Passive subdomain discovery
+- name: Certificate Transparency
+  module: crtsh_scope
+  description: CT log subdomain discovery
+  depends_on:
+  - Subdomain Enumeration
+- name: Email Harvesting
+  module: emailharvest_scope
+  description: Harvest email addresses from public sources
+  depends_on:
+  - Certificate Transparency
+- name: Shodan Search
+  module: shodan_host_scope
+  description: Search Shodan for exposed services
+  depends_on:
+  - Email Harvesting
+- name: Breach Data Lookup
+  module: dehashed_scope
+  description: Check for credential breaches
+  depends_on:
+  - Shodan Search

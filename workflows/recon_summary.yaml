@@ -1,0 +1,35 @@
+# Shipped SEED workflow (read-only template) -- T14.
+# Serialized from the built-in Python Workflow of the same id; the id is a
+# protected seed (workflow_validate.PROTECTED_SEED_IDS) so a custom save can
+# never shadow it. To customize, clone to your engagement (Duplicate) and
+# edit the copy -- never edit this file. The Python built-in stays as a
+# belt-and-suspenders fallback for this release.
+id: recon_summary
+name: Automated Recon + AI Summary
+description: Passive subdomain discovery → HTTP probing → vulnerability scan → an anonymized AI summary of the external attack surface
+category: automated
+template: true
+version: 1
+steps:
+- name: Subdomain Discovery
+  module: subfinder
+  description: Passive subdomain enumeration (subfinder) against the engagement scope
+- name: HTTP Probe
+  module: httpx
+  description: Probe live web services + tech detection (httpx); imports hosts/ports
+  depends_on:
+  - Subdomain Discovery
+- name: Vulnerability Scan
+  module: nuclei
+  description: Templated vulnerability scan (nuclei) over discovered web services
+  depends_on:
+  - HTTP Probe
+  params:
+    severity: critical,high,medium,low,info
+- name: AI Summary
+  type: ai_checkpoint
+  module: ''
+  description: AI summarizes the recon findings into the engagement (anonymized)
+  depends_on:
+  - Vulnerability Scan
+  prompt: 'Reconnaissance is complete. Use get_engagement_status and get_findings to review what was discovered: subdomains, live web services with their detected technologies, and any vulnerabilities. Write a concise executive summary of the external attack surface — key subdomains and exposed services, notable technologies, findings grouped by severity, and the top recommended next steps. Do not propose any intrusive actions.'

@@ -1,0 +1,76 @@
+name: Web Application Assessment Workflow
+description: Comprehensive web application testing - recon, enumeration, vulnerability scanning
+enabled: true
+
+steps:
+  - name: subdomain_enum
+    module: subfinder
+    description: Discover all subdomains
+    params: {}
+
+  - name: port_scanning
+    module: nmap
+    description: Scan all discovered hosts for open ports
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params:
+      scan_type: fast
+
+  - name: web_screenshots
+    module: gowitness
+    description: Capture screenshots of all web services
+    condition: web_services_found
+    depends_on:
+      - port_scanning
+    params: {}
+
+  - name: waf_detection
+    module: waf_detection
+    description: Detect WAF/CDN protection on web services
+    condition: web_services_found
+    depends_on:
+      - port_scanning
+    params: {}
+
+  - name: web_tech_detection
+    module: fingerprinting
+    description: Identify web technologies and frameworks
+    condition: web_services_found
+    depends_on:
+      - port_scanning
+    params: {}
+
+  - name: directory_bruteforce
+    module: ffuf
+    description: Discover hidden directories and files
+    condition: web_services_found
+    depends_on:
+      - waf_detection
+    params:
+      wordlist: common
+
+  - name: web_exposure_check
+    module: git_exposure
+    description: Check for exposed Git repositories and sensitive files
+    condition: web_services_found
+    depends_on:
+      - port_scanning
+    params: {}
+
+  - name: vulnerability_scan
+    module: nuclei
+    description: Scan for known web vulnerabilities
+    condition: web_services_found
+    depends_on:
+      - directory_bruteforce
+    params:
+      templates: web
+
+  - name: exploit_search
+    module: exploits
+    description: Search for exploits for discovered technologies
+    condition: vulnerabilities_found
+    depends_on:
+      - vulnerability_scan
+    params: {}

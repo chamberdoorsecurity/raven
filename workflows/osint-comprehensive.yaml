@@ -1,0 +1,49 @@
+name: OSINT Comprehensive Workflow
+description: Complete OSINT enumeration with GitHub dorking, Wayback Machine, email harvesting, and Shodan
+enabled: true
+
+steps:
+  - name: subdomain_enum
+    module: subfinder
+    description: Enumerate subdomains using multiple techniques
+    params: {}
+
+  - name: email_harvest
+    module: emailharvest_scope
+    description: Harvest emails from discovered domains
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: wayback_enum
+    module: wayback_scope
+    description: Enumerate historical URLs from Wayback Machine
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: github_dorking
+    module: github_dork_scope
+    description: Search GitHub for leaked secrets and credentials
+    condition: subdomains_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: shodan_lookups
+    module: shodan_host_scope
+    description: Perform Shodan lookups on all discovered IPs
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: breach_check
+    module: dehashed_scope
+    description: Check for credential breaches
+    condition: emails_found
+    depends_on:
+      - email_harvest
+    params: {}

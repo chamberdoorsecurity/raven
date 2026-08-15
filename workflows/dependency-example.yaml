@@ -1,0 +1,73 @@
+name: "Dependency Example Workflow"
+description: "Demonstrates how dependencies work and handle failures gracefully"
+category: example
+tags:
+  - example
+  - tutorial
+
+steps:
+  # Step 1: No dependencies - always runs first
+  - name: Host Discovery
+    module: nmap
+    description: "Discover hosts and open ports (may fail if hosts are down)"
+    params:
+      nmap_profile: quick
+
+  # Step 2: Depends on Step 1 - runs only if nmap succeeds
+  - name: Web Screenshots
+    module: gowitness
+    description: "Take screenshots of discovered web services"
+    depends_on:
+      - Host Discovery
+
+  # Step 3: Depends on Step 1 - runs only if nmap succeeds (parallel with Step 2)
+  - name: Service Fingerprinting
+    module: fingerprinting
+    description: "Identify web server types and versions"
+    depends_on:
+      - Host Discovery
+
+  # Step 4: Depends on Step 2 - creates a chain: nmap → gowitness → ffuf
+  - name: Directory Brute Force
+    module: ffuf
+    description: "Find hidden files and directories on web servers"
+    depends_on:
+      - Web Screenshots
+
+  # Step 5: No dependencies - runs independently of the scanning chain
+  - name: Subdomain Enumeration
+    module: sublist3r_scope
+    description: "Find subdomains using passive reconnaissance (runs regardless of nmap status)"
+
+  # Step 6: Depends on Step 5 - separate chain from the scanning
+  - name: Certificate Transparency
+    module: crtsh_scope
+    description: "Find subdomains via certificate transparency logs"
+    depends_on:
+      - Subdomain Enumeration
+
+# Expected behavior:
+#
+# SCENARIO 1: All steps succeed
+# ├─ Host Discovery          ✓ succeeds
+# │  ├─ Web Screenshots      ✓ succeeds (waits for nmap)
+# │  │  └─ Directory Brute   ✓ succeeds (waits for gowitness)
+# │  └─ Service Fingerprint  ✓ succeeds (waits for nmap, parallel with gowitness)
+# └─ Subdomain Enum          ✓ succeeds (independent)
+#    └─ Certificate Trans    ✓ succeeds (waits for subdomain enum)
+#
+# SCENARIO 2: Host Discovery fails
+# ├─ Host Discovery          ✗ fails (no hosts respond)
+# │  ├─ Web Screenshots      ⊘ skipped (dependency failed)
+# │  │  └─ Directory Brute   ⊘ skipped (dependency failed)
+# │  └─ Service Fingerprint  ⊘ skipped (dependency failed)
+# └─ Subdomain Enum          ✓ succeeds (no dependencies, still runs!)
+#    └─ Certificate Trans    ✓ succeeds (its dependency succeeded)
+#
+# SCENARIO 3: Web Screenshots fails
+# ├─ Host Discovery          ✓ succeeds
+# │  ├─ Web Screenshots      ✗ fails (browser timeout)
+# │  │  └─ Directory Brute   ⊘ skipped (dependency failed)
+# │  └─ Service Fingerprint  ✓ succeeds (its dependency succeeded)
+# └─ Subdomain Enum          ✓ succeeds (independent)
+#    └─ Certificate Trans    ✓ succeeds (its dependency succeeded)

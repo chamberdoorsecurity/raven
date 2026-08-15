@@ -1,0 +1,35 @@
+# Shipped SEED workflow (read-only template) -- T14.
+# Serialized from the built-in Python Workflow of the same id; the id is a
+# protected seed (workflow_validate.PROTECTED_SEED_IDS) so a custom save can
+# never shadow it. To customize, clone to your engagement (Duplicate) and
+# edit the copy -- never edit this file. The Python built-in stays as a
+# belt-and-suspenders fallback for this release.
+id: quick_scan
+name: Quick Scan
+description: 'Fast reconnaissance: port scan → screenshots → nuclei (critical/high only)'
+category: quick
+template: true
+version: 1
+steps:
+- name: Port Scanning
+  module: nmap
+  description: Quick port scan
+  params:
+    nmap_profile: quick
+- name: Web Screenshots
+  module: gowitness
+  description: Screenshot web services
+  depends_on:
+  - Port Scanning
+- name: Critical Vuln Scan
+  module: nuclei
+  description: Scan for critical/high vulns only
+  depends_on:
+  - Web Screenshots
+  params:
+    severity: critical,high
+- name: Exploit Search
+  module: exploits
+  description: Find exploits for discovered CVEs
+  depends_on:
+  - Critical Vuln Scan

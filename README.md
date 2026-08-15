@@ -57,9 +57,12 @@ Pin a digest instead of a tag:
 docker image inspect ghcr.io/chamberdoorsecurity/raven:latest --format '{{index .RepoDigests 0}}'
 ```
 
-## Source
+## What is in this repo
 
-Closed source. This repo is docs and issues. The Docker image ships a compiled binary, not Python source.
+- `workflows/` — the 17 shipped workflow templates (OWASP WSTG, PTES, external perimeter, web app, OSINT, and others). Fork one, edit the steps, drop it in your engagement's `workflows/` dir.
+- `modules/examples/` — example YAML modules showing the format for wrapping your own tools.
+
+Raven itself is closed source. The Docker image ships a compiled binary, not Python source, so GitHub's auto-generated "Source code" archives on each release contain these templates, not the product.
 
 ## Links
 

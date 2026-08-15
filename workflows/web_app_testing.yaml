@@ -1,0 +1,38 @@
+# Shipped SEED workflow (read-only template) -- T14.
+# Serialized from the built-in Python Workflow of the same id; the id is a
+# protected seed (workflow_validate.PROTECTED_SEED_IDS) so a custom save can
+# never shadow it. To customize, clone to your engagement (Duplicate) and
+# edit the copy -- never edit this file. The Python built-in stays as a
+# belt-and-suspenders fallback for this release.
+id: web_app_testing
+name: Web Application Testing
+description: 'Comprehensive web app assessment: screenshots → directory brute → git exposure → API discovery → nuclei scan'
+category: web
+template: true
+version: 1
+steps:
+- name: Web Screenshots
+  module: gowitness
+  description: Visual reconnaissance of web applications
+- name: Directory Brute Force
+  module: ffuf
+  description: Find hidden files and directories
+  depends_on:
+  - Web Screenshots
+- name: Git Exposure Check
+  module: git_exposure
+  description: Check for exposed version control
+  depends_on:
+  - Directory Brute Force
+- name: API Discovery
+  module: api_discovery
+  description: Discover API endpoints
+  depends_on:
+  - Git Exposure Check
+- name: Vulnerability Scan
+  module: nuclei
+  description: Automated vulnerability scanning
+  depends_on:
+  - API Discovery
+  params:
+    severity: critical,high,medium

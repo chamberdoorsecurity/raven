@@ -1,0 +1,95 @@
+# Shipped SEED workflow (read-only template) -- T14.
+# Serialized from the built-in Python Workflow of the same id; the id is a
+# protected seed (workflow_validate.PROTECTED_SEED_IDS) so a custom save can
+# never shadow it. To customize, clone to your engagement (Duplicate) and
+# edit the copy -- never edit this file. The Python built-in stays as a
+# belt-and-suspenders fallback for this release.
+id: full_external
+name: Adaptive External Pentest
+description: 'Intelligent progressive scanning: quick discovery → adaptive deep scans → service-specific enumeration → vulnerability assessment'
+category: comprehensive
+template: true
+version: 1
+steps:
+- name: Subdomain Enumeration
+  module: sublist3r_scope
+  description: Discover subdomains using Sublist3r (passive)
+- name: Certificate Transparency
+  module: crtsh_scope
+  description: Find subdomains via CT logs
+  depends_on:
+  - Subdomain Enumeration
+- name: Quick Port Scan
+  module: nmap
+  description: Fast scan of top 1000 ports to find responsive services
+  depends_on:
+  - Certificate Transparency
+  params:
+    nmap_profile: quick
+- name: 'AI Review: Discovery'
+  type: ai_checkpoint
+  module: ''
+  description: AI reviews initial discovery results and adjusts the plan
+  depends_on:
+  - Quick Port Scan
+  prompt: Initial discovery complete (subdomains + quick port scan). Use get_engagement_status to review what was found. Should we adjust the next phases based on findings?
+- name: Service Detection
+  module: nmap
+  description: Detailed service version detection on discovered open ports
+  depends_on:
+  - 'AI Review: Discovery'
+  params:
+    nmap_profile: balanced
+- name: Web Screenshots
+  module: gowitness
+  description: Visual recon of web applications
+  depends_on:
+  - Service Detection
+- name: Directory Brute Force
+  module: ffuf
+  description: Find hidden paths on web servers
+  depends_on:
+  - Web Screenshots
+- name: Git Exposure Check
+  module: git_exposure
+  description: Check for exposed .git repositories
+  depends_on:
+  - Directory Brute Force
+- name: API Discovery
+  module: api_discovery
+  description: Enumerate API endpoints
+  depends_on:
+  - Git Exposure Check
+- name: Full Port Scan
+  module: nmap
+  description: Comprehensive all-port scan on hosts with identified services
+  depends_on:
+  - API Discovery
+  params:
+    nmap_profile: thorough
+- name: 'AI Review: Pre-Vuln'
+  type: ai_checkpoint
+  module: ''
+  description: AI reviews enumeration results before vulnerability scanning
+  depends_on:
+  - Full Port Scan
+  prompt: Enumeration complete. Use get_engagement_status to review all hosts, ports, web services, and directories found. Before vuln scanning, should we adjust scope or priorities?
+- name: Vulnerability Scan
+  module: nuclei
+  description: Automated vulnerability detection
+  depends_on:
+  - 'AI Review: Pre-Vuln'
+  params:
+    severity: critical,high,medium
+- name: Exploit Search
+  module: exploits
+  description: Find public exploits for CVEs
+  depends_on:
+  - Vulnerability Scan
+- name: AI Final Review
+  type: ai_checkpoint
+  module: ''
+  description: AI provides final assessment summary and recommendations
+  depends_on:
+  - Exploit Search
+  prompt: 'Assessment complete. Use get_engagement_status and get_findings to review all results. Provide a final summary: key findings by severity, potential attack paths, and remediation priorities.'

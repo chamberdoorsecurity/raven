@@ -1,0 +1,226 @@
+name: "Bug Bounty Hunter Methodology"
+description: "Fast-paced vulnerability discovery optimized for bug bounty programs - focus on high-impact findings"
+version: "1.0"
+author: "Raven Framework"
+category: "methodology"
+
+steps:
+  # Phase 1: Rapid Reconnaissance (Speed is key)
+
+  - name: "Subdomain Discovery - Multi-Source"
+    description: "Aggressive subdomain enumeration using all available sources"
+    module: "subfinder"
+    params:
+      method: "all"
+
+  - name: "Screenshot All Targets"
+    description: "Quick visual reconnaissance of all discovered assets"
+    module: "gowitness"
+    depends_on: ["Subdomain Discovery - Multi-Source"]
+
+  - name: "Technology Fingerprinting"
+    description: "Identify technologies for targeted exploitation"
+    module: "nuclei"
+    params:
+      templates: "technologies"
+    depends_on: ["Subdomain Discovery - Multi-Source"]
+
+  # Phase 2: High-Impact Vulnerability Scanning
+
+  - name: "Critical CVE Scanning"
+    description: "Scan for critical and high-severity CVEs with known exploits"
+    module: "nuclei"
+    params:
+      templates: "cves"
+      severity: "critical,high"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "Authentication Bypass Detection"
+    description: "Test for auth bypass vulnerabilities (high bounty potential)"
+    module: "nuclei"
+    params:
+      templates: "auth-bypass,default-logins"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "SQL Injection Detection"
+    description: "Test for SQLi vulnerabilities (high-severity)"
+    module: "nuclei"
+    params:
+      templates: "sqli"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "Remote Code Execution Detection"
+    description: "Test for RCE vulnerabilities (critical bounty potential)"
+    module: "nuclei"
+    params:
+      templates: "rce"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "Server-Side Request Forgery (SSRF)"
+    description: "Test for SSRF vulnerabilities (high-impact)"
+    module: "nuclei"
+    params:
+      templates: "ssrf"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "File Inclusion Vulnerabilities"
+    description: "Test for LFI/RFI (often leads to RCE)"
+    module: "nuclei"
+    params:
+      templates: "lfi,file"
+    depends_on: ["Technology Fingerprinting"]
+
+  # Phase 3: Information Disclosure
+
+  - name: "Sensitive Data Exposure"
+    description: "Find exposed configuration files, backups, and secrets"
+    module: "nuclei"
+    params:
+      templates: "exposures,misconfigurations"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "API Endpoint Discovery"
+    description: "Discover hidden API endpoints"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt"
+      extensions: "json"
+      threads: 100
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "GitHub Secret Scanning"
+    description: "Find leaked credentials and API keys in repositories"
+    module: "github_dork_scope"
+    skip_if_no_api_key: true
+
+  - name: "Credential Breach Search"
+    description: "Search for compromised credentials"
+    module: "dehashed"
+    skip_if_no_api_key: true
+
+  # Phase 4: Client-Side Vulnerabilities
+
+  - name: "Cross-Site Scripting (XSS) Detection"
+    description: "Test for reflected, stored, and DOM-based XSS"
+    module: "nuclei"
+    params:
+      templates: "xss"
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "Cross-Origin Resource Sharing (CORS) Misconfiguration"
+    description: "Test for CORS misconfigurations (high-impact)"
+    module: "nuclei"
+    params:
+      templates: "misconfiguration"
+    depends_on: ["Technology Fingerprinting"]
+
+  # Phase 5: Advanced Discovery
+
+  - name: "Content Discovery"
+    description: "Aggressive content discovery for hidden functionality"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt"
+      extensions: "php,asp,aspx,jsp,js,json,xml,html,txt,bak"
+      threads: 100
+    depends_on: ["Technology Fingerprinting"]
+
+  - name: "Parameter Fuzzing"
+    description: "Discover hidden parameters and endpoints"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt"
+      mode: "GET"
+    depends_on: ["Content Discovery"]
+    skip_if_no_tool: true
+
+  # Phase 6: Business Logic Testing
+
+  - name: "IDOR and Access Control Testing"
+    description: "Test for Insecure Direct Object References"
+    module: "nuclei"
+    params:
+      templates: "idor"
+    depends_on: ["API Endpoint Discovery"]
+    skip_if_no_tool: true
+
+  - name: "Rate Limiting Bypass"
+    description: "Test for rate limiting bypass opportunities"
+    module: "nuclei"
+    params:
+      templates: "misconfiguration"
+    depends_on: ["Technology Fingerprinting"]
+
+  # Phase 7: SSL/TLS Assessment (Lower priority for bug bounty)
+
+  - name: "SSL/TLS Vulnerabilities"
+    description: "Quick SSL/TLS assessment (lower bounty potential)"
+    module: "ssl_enum"
+    depends_on: ["Subdomain Discovery - Multi-Source"]
+
+# Execution Options
+options:
+  parallel_execution: true
+  max_parallel_steps: 8  # Aggressive parallel execution
+  stop_on_critical: false  # Continue even if critical found - maximize findings
+  estimated_time: "60-90 minutes"  # Fast execution
+
+# Bug Bounty Strategy
+strategy:
+  prioritization:
+    - "Critical CVEs (RCE, Auth Bypass, SQLi)"
+    - "SSRF and File Inclusion"
+    - "Information Disclosure"
+    - "XSS and Client-Side Issues"
+    - "Business Logic Flaws"
+    - "SSL/TLS Issues (low priority)"
+
+  focus_areas:
+    - "Newly discovered subdomains (less tested)"
+    - "Recently deployed features"
+    - "API endpoints"
+    - "File upload functionality"
+    - "Authentication mechanisms"
+
+  quick_wins:
+    - "Default credentials"
+    - "Exposed admin panels"
+    - "Known CVEs in identified technologies"
+    - "Git repositories with secrets"
+    - "Misconfigured CORS"
+
+# Success Criteria
+success_criteria:
+  - "All subdomains discovered and tested"
+  - "Critical vulnerabilities identified"
+  - "Quick turnaround time (< 2 hours)"
+  - "Focus on high-impact findings"
+
+# Required Tools
+required_tools:
+  - "nuclei"
+  - "sublist3r"
+  - "feroxbuster"
+  - "gowitness"
+
+optional_tools:
+  - "ffuf"
+  - "dehashed"
+  - "github"
+  - "sslscan"
+
+# Reporting Notes
+reporting_tips:
+  - "Include clear proof-of-concept for all findings"
+  - "Capture screenshots with gowitness"
+  - "Focus on impact and exploitability"
+  - "Provide remediation recommendations"
+  - "Chain vulnerabilities when possible for higher impact"
+
+# Tags
+tags:
+  - "bug-bounty"
+  - "fast"
+  - "high-impact"
+  - "offensive"
+  - "vuln-discovery"

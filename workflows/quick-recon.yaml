@@ -1,0 +1,47 @@
+name: Quick Reconnaissance
+description: Fast reconnaissance for time-sensitive assessments
+enabled: true
+
+steps:
+  - name: subdomain_enum
+    module: subfinder
+    description: Quick subdomain discovery
+    params:
+      timeout: 300
+
+  - name: quick_port_scan
+    module: nmap
+    description: Fast scan of common ports
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params:
+      scan_type: quick
+      top_ports: 1000
+
+  - name: web_screenshots
+    module: gowitness
+    description: Capture screenshots of discovered web services
+    condition: web_services_found
+    depends_on:
+      - quick_port_scan
+    params:
+      timeout: 10
+
+  - name: tech_fingerprint
+    module: fingerprinting
+    description: Quick technology detection
+    condition: web_services_found
+    depends_on:
+      - quick_port_scan
+    params: {}
+
+  - name: basic_vuln_scan
+    module: nuclei
+    description: Scan for high-severity vulnerabilities only
+    condition: web_services_found
+    depends_on:
+      - quick_port_scan
+    params:
+      severity: critical,high
+      templates: cves,exposures

@@ -1,0 +1,61 @@
+name: Network Infrastructure Assessment
+description: Deep network scanning and service enumeration
+enabled: true
+
+steps:
+  - name: subdomain_enum
+    module: subfinder
+    description: Enumerate all subdomains
+    params: {}
+
+  - name: comprehensive_port_scan
+    module: nmap
+    description: Full TCP port scan on all hosts
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params:
+      scan_type: full
+      service_detection: true
+      os_detection: true
+
+  - name: ssl_enumeration
+    module: ssl_enum
+    description: Enumerate SSL/TLS configurations
+    condition: ssl_services_found
+    depends_on:
+      - comprehensive_port_scan
+    params: {}
+
+  - name: ssl_vuln_scan
+    module: ssl_vuln_scan
+    description: Test for SSL/TLS vulnerabilities
+    condition: ssl_services_found
+    depends_on:
+      - ssl_enumeration
+    params: {}
+
+  - name: shodan_osint
+    module: shodan_host_scope
+    description: Gather OSINT from Shodan
+    condition: hosts_found
+    depends_on:
+      - subdomain_enum
+    params: {}
+
+  - name: service_vuln_scan
+    module: nuclei
+    description: Scan for service-specific vulnerabilities
+    condition: hosts_found
+    depends_on:
+      - comprehensive_port_scan
+    params:
+      templates: network
+
+  - name: exploit_mapping
+    module: exploits
+    description: Map discovered services to known exploits
+    condition: vulnerabilities_found
+    depends_on:
+      - service_vuln_scan
+    params: {}

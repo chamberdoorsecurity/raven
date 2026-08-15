@@ -1,0 +1,209 @@
+name: "OWASP Web Security Testing Guide (WSTG)"
+description: "Comprehensive web application security testing based on OWASP WSTG v4.2"
+version: "1.0"
+author: "Raven Framework"
+category: "methodology"
+
+steps:
+  # Phase 1: Information Gathering (WSTG-INFO)
+  - name: "Subdomain Enumeration"
+    description: "Discover all subdomains and related infrastructure (WSTG-INFO-02)"
+    module: "subfinder"
+    params:
+      method: "all"
+
+  - name: "Subdomain Certificate Analysis"
+    description: "Analyze SSL/TLS certificates for additional domains (WSTG-INFO-02)"
+    module: "crtsh_scope"
+    params:
+      method: "crt.sh"
+    depends_on: []
+
+  - name: "Search Engine Discovery"
+    description: "Use search engines to discover hidden content (WSTG-INFO-01)"
+    module: "google_dorks"
+    params:
+      queries:
+        - "site:TARGET inurl:admin"
+        - "site:TARGET filetype:pdf"
+        - "site:TARGET ext:txt | ext:log | ext:conf"
+    skip_if_no_tool: true
+
+  - name: "Web Server Fingerprinting"
+    description: "Identify web server technology and version (WSTG-INFO-02)"
+    module: "fingerprinting"
+    depends_on: ["Subdomain Enumeration"]
+    skip_if_no_tool: true
+
+  - name: "Web Application Fingerprinting"
+    description: "Identify web application frameworks and technologies (WSTG-INFO-08)"
+    module: "nuclei"
+    params:
+      templates: "technologies"
+    depends_on: ["Subdomain Enumeration"]
+
+  # Phase 2: Configuration and Deployment Management (WSTG-CONF)
+  - name: "SSL/TLS Configuration Testing"
+    description: "Test SSL/TLS implementation and configuration (WSTG-CRYP-01)"
+    module: "ssl_enum"
+    depends_on: ["Subdomain Enumeration"]
+
+  - name: "HTTP Methods Testing"
+    description: "Test for dangerous HTTP methods (WSTG-CONF-06)"
+    module: "nuclei"
+    params:
+      templates: "http-methods"
+    depends_on: ["Subdomain Enumeration"]
+
+  - name: "Test File Extensions Handling"
+    description: "Test file upload and extension handling (WSTG-CONF-03)"
+    module: "nuclei"
+    params:
+      templates: "file"
+    depends_on: ["Web Server Fingerprinting"]
+
+  # Phase 3: Identity Management (WSTG-IDNT)
+  - name: "Breach Data Collection"
+    description: "Check for exposed credentials in data breaches (WSTG-IDNT-04)"
+    module: "dehashed"
+    skip_if_no_api_key: true
+
+  - name: "GitHub Secret Scanning"
+    description: "Search for exposed credentials in code repositories (WSTG-IDNT-04)"
+    module: "github_dork_scope"
+    skip_if_no_api_key: true
+
+  # Phase 4: Authentication Testing (WSTG-ATHN)
+  - name: "Authentication Vulnerability Scanning"
+    description: "Scan for authentication bypass and weaknesses (WSTG-ATHN)"
+    module: "nuclei"
+    params:
+      templates: "cves,default-logins,exposures"
+      severity: "critical,high,medium"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 5: Authorization Testing (WSTG-ATHZ)
+  - name: "Directory Traversal Testing"
+    description: "Test for path traversal vulnerabilities (WSTG-ATHZ-01)"
+    module: "nuclei"
+    params:
+      templates: "lfi,file"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 6: Session Management (WSTG-SESS)
+  - name: "Session Management Testing"
+    description: "Test session fixation and cookie security (WSTG-SESS)"
+    module: "nuclei"
+    params:
+      templates: "token,cookies"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 7: Input Validation (WSTG-INPV)
+  - name: "SQL Injection Testing"
+    description: "Test for SQL injection vulnerabilities (WSTG-INPV-05)"
+    module: "nuclei"
+    params:
+      templates: "sqli"
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "Cross-Site Scripting (XSS) Testing"
+    description: "Test for reflected, stored, and DOM-based XSS (WSTG-INPV-07)"
+    module: "nuclei"
+    params:
+      templates: "xss"
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "Command Injection Testing"
+    description: "Test for OS command injection (WSTG-INPV-12)"
+    module: "nuclei"
+    params:
+      templates: "rce,injection"
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "XXE Injection Testing"
+    description: "Test for XML External Entity injection (WSTG-INPV-07)"
+    module: "nuclei"
+    params:
+      templates: "xxe"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 8: Error Handling (WSTG-ERRH)
+  - name: "Error Handling Analysis"
+    description: "Test error handling and information leakage (WSTG-ERRH-01)"
+    module: "nuclei"
+    params:
+      templates: "exposures,misconfigurations"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 9: Cryptography (WSTG-CRYP)
+  - name: "Weak Cryptography Testing"
+    description: "Test for weak encryption and hashing (WSTG-CRYP-04)"
+    module: "nuclei"
+    params:
+      templates: "ssl,tls"
+    depends_on: ["SSL/TLS Configuration Testing"]
+
+  # Phase 10: Business Logic (WSTG-BUSL)
+  - name: "Business Logic Vulnerabilities"
+    description: "Scan for business logic flaws (WSTG-BUSL)"
+    module: "nuclei"
+    params:
+      templates: "workflows"
+    depends_on: ["Web Application Fingerprinting"]
+
+  # Phase 11: Client-Side Testing (WSTG-CLNT)
+  - name: "Content Discovery and Crawling"
+    description: "Discover hidden files, directories, and endpoints (WSTG-INFO-03)"
+    module: "ffuf"
+    params:
+      wordlist: "/usr/share/seclists/Discovery/Web-Content/raft-large-directories.txt"
+      extensions: "php,asp,aspx,jsp,html,js,json,xml,txt,bak,old"
+      threads: 50
+    depends_on: ["Web Application Fingerprinting"]
+
+  - name: "JavaScript Analysis"
+    description: "Analyze JavaScript for sensitive data and endpoints (WSTG-CLNT-01)"
+    module: "js_analysis"
+    depends_on: ["Content Discovery and Crawling"]
+    skip_if_no_tool: true
+
+  # Final: Visual Evidence Collection
+  - name: "Screenshot Evidence Collection"
+    description: "Capture screenshots of all discovered services"
+    module: "gowitness"
+    depends_on: ["Subdomain Enumeration"]
+
+# Execution Options
+options:
+  parallel_execution: true
+  max_parallel_steps: 5
+  stop_on_critical: false
+  estimated_time: "120-180 minutes"
+
+# Success Criteria
+success_criteria:
+  - "All subdomains discovered and documented"
+  - "Web technologies and frameworks identified"
+  - "OWASP Top 10 vulnerabilities tested"
+  - "Screenshots captured for evidence"
+
+# Required Tools
+required_tools:
+  - "nuclei"
+  - "sublist3r"
+  - "sslscan"
+  - "feroxbuster"
+  - "gowitness"
+
+optional_tools:
+  - "whatweb"
+  - "dehashed"
+  - "github"
+
+# Tags
+tags:
+  - "owasp"
+  - "web-application"
+  - "comprehensive"
+  - "methodology"
+  - "wstg"

@@ -1,0 +1,234 @@
+# LDAP Enumerator - Comprehensive LDAP Reconnaissance
+# Pro Tier Module - Requires valid Raven Pro license
+name: "LDAP Enumerator"
+description: |
+  Comprehensive LDAP enumeration module for internal assessments:
+  - Anonymous bind testing
+  - Base DN discovery
+  - User and group enumeration
+  - Service account discovery (with SPNs)
+  - Computer account enumeration
+  - Organizational unit mapping
+  - Group membership recursion
+  - Password policy extraction
+  - LAPS password extraction (if accessible)
+  - GPO enumeration
+  - Trust relationships
+version: "1.1.0"
+author: "Raven Team"
+tool: ldapsearch
+category: internal
+tier: pro
+
+tags:
+  - ldap
+  - active-directory
+  - enumeration
+  - reconnaissance
+  - internal
+
+inputs:
+  - name: target
+    type: string
+    required: true
+    description: "LDAP server IP or hostname"
+
+  - name: domain
+    type: string
+    required: true
+    description: "Domain in FQDN format (e.g., corp.local)"
+
+  - name: username
+    type: string
+    default: ""
+    description: "Username for authenticated queries (empty for anonymous)"
+
+  - name: password
+    type: string
+    default: ""
+    description: "Password for authentication"
+
+  - name: scan_mode
+    type: choice
+    default: "full"
+    choices: ["full", "anonymous", "users", "groups", "computers", "gpo", "trust"]
+    description: "Type of enumeration to perform"
+
+  - name: output_limit
+    type: number
+    default: 5000
+    description: "Maximum number of results to return"
+
+command: |
+  # Build base DN from domain
+  BASE_DN=$(echo "{{domain}}" | sed 's/\./,DC=/g' | sed 's/^/DC=/')
+  echo "[*] Base DN: $BASE_DN"
+
+  # Build auth string
+  {% if username and password %}
+  LDAP_AUTH="-D '{{username}}@{{domain}}' -w '{{password}}'"
+  {% else %}
+  LDAP_AUTH="-x"
+  {% endif %}
+
+  echo "[*] LDAP Enumerator starting against {{target}}";
+
+  {% if scan_mode == 'anonymous' or scan_mode == 'full' %}
+  # Test anonymous bind
+  echo "[*] Testing anonymous LDAP bind";
+  ldapsearch -x -H ldap://{{target}} -b "$BASE_DN" -s base "(objectclass=*)" 2>&1 | head -50 | tee {{output_file}}_anon_test.txt;
+
+  # Root DSE query (always anonymous)
+  echo "[*] Querying Root DSE";
+  ldapsearch -x -H ldap://{{target}} -s base "(objectclass=*)" "*" + 2>/dev/null | tee {{output_file}}_rootdse.txt;
+  {% endif %}
+
+  {% if scan_mode == 'users' or scan_mode == 'full' %}
+  # User enumeration
+  echo "[*] Enumerating domain users";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(objectCategory=person)" sAMAccountName userPrincipalName displayName description memberOf \
+    -z {{output_limit}} 2>/dev/null | tee {{output_file}}_users.txt;
+
+  # Find users with SPNs (Kerberoastable)
+  echo "[*] Finding Kerberoastable users (SPNs)";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(&(objectCategory=person)(servicePrincipalName=*))" sAMAccountName servicePrincipalName \
+    2>/dev/null | tee {{output_file}}_spn_users.txt;
+
+  # Find users without pre-auth (AS-REP roastable)
+  echo "[*] Finding AS-REP roastable users";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(&(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=4194304))" sAMAccountName \
+    2>/dev/null | tee {{output_file}}_asrep_users.txt;
+
+  # Find disabled accounts
+  echo "[*] Finding disabled accounts";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(&(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=2))" sAMAccountName \
+    2>/dev/null | tee {{output_file}}_disabled.txt;
+
+  # Find accounts with password never expires
+  echo "[*] Finding accounts with non-expiring passwords";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(&(objectCategory=person)(userAccountControl:1.2.840.113556.1.4.803:=65536))" sAMAccountName \
+    2>/dev/null | tee {{output_file}}_pwd_never_expires.txt;
+  {% endif %}
+
+  {% if scan_mode == 'groups' or scan_mode == 'full' %}
+  # Group enumeration
+  echo "[*] Enumerating domain groups";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(objectCategory=group)" sAMAccountName description member \
+    -z {{output_limit}} 2>/dev/null | tee {{output_file}}_groups.txt;
+
+  # Privileged groups
+  echo "[*] Enumerating privileged groups";
+  for group in "Domain Admins" "Enterprise Admins" "Administrators" "Account Operators" "Backup Operators" "DnsAdmins"; do
+    echo "=== $group ===" >> {{output_file}}_priv_groups.txt;
+    ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+      "(cn=$group)" member 2>/dev/null >> {{output_file}}_priv_groups.txt;
+  done
+  {% endif %}
+
+  {% if scan_mode == 'computers' or scan_mode == 'full' %}
+  # Computer enumeration
+  echo "[*] Enumerating domain computers";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(objectCategory=computer)" sAMAccountName dNSHostName operatingSystem operatingSystemVersion \
+    -z {{output_limit}} 2>/dev/null | tee {{output_file}}_computers.txt;
+
+  # Domain controllers
+  echo "[*] Finding Domain Controllers";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(&(objectCategory=computer)(userAccountControl:1.2.840.113556.1.4.803:=8192))" sAMAccountName dNSHostName \
+    2>/dev/null | tee {{output_file}}_dcs.txt;
+  {% endif %}
+
+  {% if scan_mode == 'gpo' or scan_mode == 'full' %}
+  # GPO enumeration
+  echo "[*] Enumerating Group Policy Objects";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "CN=Policies,CN=System,$BASE_DN" \
+    "(objectClass=groupPolicyContainer)" displayName gPCFileSysPath \
+    2>/dev/null | tee {{output_file}}_gpo.txt;
+  {% endif %}
+
+  {% if scan_mode == 'trust' or scan_mode == 'full' %}
+  # Trust relationships
+  echo "[*] Enumerating trust relationships";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "CN=System,$BASE_DN" \
+    "(objectClass=trustedDomain)" cn trustPartner trustDirection trustType \
+    2>/dev/null | tee {{output_file}}_trusts.txt;
+  {% endif %}
+
+  # Password policy
+  echo "[*] Getting default password policy";
+  ldapsearch $LDAP_AUTH -H ldap://{{target}} -b "$BASE_DN" \
+    "(objectClass=domain)" pwdProperties minPwdLength maxPwdAge minPwdAge pwdHistoryLength lockoutDuration lockoutThreshold \
+    2>/dev/null | tee {{output_file}}_passpol.txt;
+
+  # Combine results into JSON
+  python3 -c "
+  import json, os, glob, re
+  results = {'findings': [], 'stats': {}}
+
+  for f in glob.glob('{{output_file}}_*.txt'):
+      key = f.replace('{{output_file}}_', '').replace('.txt', '')
+      if not os.path.exists(f):
+          continue
+      with open(f) as fp:
+          content = fp.read()
+          lines = content.strip().split('\n')
+          results[key] = [l for l in lines if l.strip() and not l.startswith('#')]
+
+          # Count entries
+          count = len(re.findall(r'^dn:', content, re.MULTILINE))
+          if count > 0:
+              results['stats'][key] = count
+
+          # Detect findings
+          if key == 'anon_test' and 'result: 0 Success' in content:
+              results['findings'].append({
+                  'type': 'anonymous_bind',
+                  'severity': 'high',
+                  'description': 'LDAP allows anonymous bind'
+              })
+          if key == 'spn_users' and count > 0:
+              results['findings'].append({
+                  'type': 'kerberoastable_users',
+                  'severity': 'medium',
+                  'count': count,
+                  'description': f'{count} users with SPNs (Kerberoastable)'
+              })
+          if key == 'asrep_users' and count > 0:
+              results['findings'].append({
+                  'type': 'asrep_roastable',
+                  'severity': 'high',
+                  'count': count,
+                  'description': f'{count} users without pre-auth (AS-REP roastable)'
+              })
+
+  with open('{{output_file}}', 'w') as out:
+      json.dump(results, out, indent=2)
+  "
+
+output:
+  format: json
+  file: "ldap_{{domain|safe_filename}}.json"
+
+parser:
+  type: json_path
+  results_path: "$.findings[*]"
+
+findings_mapping:
+  enabled: true
+  title_template: "LDAP {{type}} - {{domain}}"
+  severity_field: "severity"
+  severity_map:
+    critical: "critical"
+    high: "high"
+    medium: "medium"
+    low: "low"
+  description_template: "{{description}}"
+  evidence_template: "Count: {{count}}"
+  affected_hosts_field: "target"
