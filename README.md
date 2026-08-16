@@ -64,6 +64,17 @@ docker image inspect ghcr.io/chamberdoorsecurity/raven:latest --format '{{index 
 
 Raven itself is closed source. The Docker image ships a compiled binary, not Python source, so GitHub's auto-generated "Source code" archives on each release contain these templates, not the product.
 
+## License
+
+The contents of this repository, meaning the workflow templates, the example
+modules and this README, are MIT licensed. Fork them, edit them, ship them in
+your own engagements, publish your own. That is what they are here for.
+
+The MIT grant covers this repository and nothing else. Raven itself, the
+binaries and packages attached to releases here, and the container images are
+proprietary and are not licensed by it. Their terms are at
+<https://chamberdoorsecurity.com>.
+
 ## Links
 
 - Docs: <https://chamberdoorsecurity.com/docs/>
