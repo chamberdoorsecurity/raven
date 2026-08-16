@@ -26,12 +26,25 @@ Or from the web UI:
 
 ## Included Workflow Templates
 
-- **osint-comprehensive.yaml** - Complete OSINT enumeration with email harvesting, GitHub dorking, Wayback Machine, and Shodan
-- **web-app-assessment.yaml** - Full web application testing pipeline from recon to exploitation
-- **network-infrastructure.yaml** - Deep network scanning and service enumeration
-- **quick-recon.yaml** - Fast reconnaissance for time-sensitive assessments
-- **credential-hunting.yaml** - Comprehensive credential discovery through OSINT and breach data
-- **external-perimeter.yaml** - Complete external attack surface analysis
+17 templates ship with Raven. Fork any of them as a starting point.
+
+- `api-security.yaml`
+- `bug-bounty.yaml`
+- `credential-hunting.yaml`
+- `dependency-example.yaml`
+- `external-perimeter.yaml`
+- `full_external.yaml`
+- `network-infrastructure.yaml`
+- `osint-comprehensive.yaml`
+- `osint_recon.yaml`
+- `owasp-wstg.yaml`
+- `ptes.yaml`
+- `quick-recon.yaml`
+- `quick_scan.yaml`
+- `recon_summary.yaml`
+- `vuln_assessment.yaml`
+- `web-app-assessment.yaml`
+- `web_app_testing.yaml`
 
 ## Creating Custom Workflows
 
@@ -69,12 +82,12 @@ Steps can be conditionally executed based on the results of previous steps:
 ```yaml
 steps:
   - name: subdomain_enum
-    module: subdomain_enum
+    module: subfinder
     description: Enumerate subdomains
     params: {}
 
   - name: port_scan
-    module: nmap_scope
+    module: nmap
     description: Scan discovered hosts
     condition: hosts_found          # Only run if hosts were discovered
     depends_on:
@@ -100,7 +113,7 @@ Different modules accept different parameters. Here are some common examples:
 #### Nmap Scanning
 ```yaml
 - name: port_scan
-  module: nmap_scope
+  module: nmap
   params:
     scan_type: full              # Options: quick, fast, full
     top_ports: 1000              # Number of top ports to scan
@@ -111,7 +124,7 @@ Different modules accept different parameters. Here are some common examples:
 #### Nuclei Vulnerability Scanning
 ```yaml
 - name: vuln_scan
-  module: nuclei_scope
+  module: nuclei
   params:
     templates: cves,exposures    # Template categories to use
     severity: critical,high      # Only scan for these severities
@@ -120,7 +133,7 @@ Different modules accept different parameters. Here are some common examples:
 #### Directory Bruteforcing
 ```yaml
 - name: dir_bruteforce
-  module: feroxbuster_scope
+  module: ffuf
   params:
     wordlist: common             # Options: common, medium, large
     threads: 50                  # Number of concurrent threads
@@ -135,13 +148,13 @@ enabled: true
 
 steps:
   - name: subdomain_enum
-    module: subdomain_enum
+    module: subfinder
     description: Discover all subdomains
     params:
       timeout: 600
 
   - name: quick_scan
-    module: nmap_scope
+    module: nmap
     description: Fast port scan
     condition: hosts_found
     depends_on:
@@ -151,7 +164,7 @@ steps:
       top_ports: 1000
 
   - name: screenshots
-    module: gowitness_scope
+    module: gowitness
     description: Capture screenshots
     condition: web_services_found
     depends_on:
@@ -160,7 +173,7 @@ steps:
       timeout: 10
 
   - name: web_tech
-    module: wappalyzer_scope
+    module: fingerprinting
     description: Identify technologies
     condition: web_services_found
     depends_on:
@@ -168,7 +181,7 @@ steps:
     params: {}
 
   - name: high_vuln_scan
-    module: nuclei_scope
+    module: nuclei
     description: Scan for critical vulnerabilities
     condition: web_services_found
     depends_on:

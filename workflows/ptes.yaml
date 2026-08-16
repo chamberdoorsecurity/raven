@@ -11,24 +11,13 @@ steps:
   # Phase 2: Intelligence Gathering (Passive & Active Reconnaissance)
 
   ## Passive Reconnaissance
-  - name: "OSINT - Search Engine Discovery"
-    description: "Passive intelligence gathering using search engines (PTES Section 3.2.1)"
-    module: "google_dorks"
-    params:
-      queries:
-        - "site:TARGET"
-        - "site:TARGET filetype:pdf | filetype:doc | filetype:xls"
-    skip_if_no_tool: true
-
   - name: "OSINT - Breach Data Collection"
     description: "Search for leaked credentials and sensitive data (PTES Section 3.2.3)"
     module: "dehashed"
-    skip_if_no_api_key: true
 
   - name: "OSINT - Code Repository Analysis"
     description: "Search GitHub for exposed secrets and code (PTES Section 3.2.4)"
     module: "github_dork_scope"
-    skip_if_no_api_key: true
 
   - name: "OSINT - Certificate Transparency Logs"
     description: "Discover subdomains via CT logs (PTES Section 3.2.5)"
@@ -122,7 +111,6 @@ steps:
       wordlist: "/usr/share/seclists/Discovery/Web-Content/api/api-endpoints.txt"
       extensions: "json"
     depends_on: ["Web Application Fingerprinting"]
-    skip_if_no_tool: true
 
   ## Exploitation Attack Vectors
   - name: "SQL Injection Detection"
@@ -181,7 +169,6 @@ steps:
     description: "Identify WAF/IPS/IDS for reporting (PTES Section 7.2)"
     module: "waf_detection"
     depends_on: ["Active Subdomain Enumeration"]
-    skip_if_no_tool: true
 
 # Execution Options
 options:

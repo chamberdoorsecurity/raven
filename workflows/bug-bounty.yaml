@@ -91,12 +91,10 @@ steps:
   - name: "GitHub Secret Scanning"
     description: "Find leaked credentials and API keys in repositories"
     module: "github_dork_scope"
-    skip_if_no_api_key: true
 
   - name: "Credential Breach Search"
     description: "Search for compromised credentials"
     module: "dehashed"
-    skip_if_no_api_key: true
 
   # Phase 4: Client-Side Vulnerabilities
 
@@ -132,7 +130,6 @@ steps:
       wordlist: "/usr/share/seclists/Discovery/Web-Content/burp-parameter-names.txt"
       mode: "GET"
     depends_on: ["Content Discovery"]
-    skip_if_no_tool: true
 
   # Phase 6: Business Logic Testing
 
@@ -142,7 +139,6 @@ steps:
     params:
       templates: "idor"
     depends_on: ["API Endpoint Discovery"]
-    skip_if_no_tool: true
 
   - name: "Rate Limiting Bypass"
     description: "Test for rate limiting bypass opportunities"

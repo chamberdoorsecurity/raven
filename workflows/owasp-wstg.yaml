@@ -19,21 +19,10 @@ steps:
       method: "crt.sh"
     depends_on: []
 
-  - name: "Search Engine Discovery"
-    description: "Use search engines to discover hidden content (WSTG-INFO-01)"
-    module: "google_dorks"
-    params:
-      queries:
-        - "site:TARGET inurl:admin"
-        - "site:TARGET filetype:pdf"
-        - "site:TARGET ext:txt | ext:log | ext:conf"
-    skip_if_no_tool: true
-
   - name: "Web Server Fingerprinting"
     description: "Identify web server technology and version (WSTG-INFO-02)"
     module: "fingerprinting"
     depends_on: ["Subdomain Enumeration"]
-    skip_if_no_tool: true
 
   - name: "Web Application Fingerprinting"
     description: "Identify web application frameworks and technologies (WSTG-INFO-08)"
@@ -66,12 +55,10 @@ steps:
   - name: "Breach Data Collection"
     description: "Check for exposed credentials in data breaches (WSTG-IDNT-04)"
     module: "dehashed"
-    skip_if_no_api_key: true
 
   - name: "GitHub Secret Scanning"
     description: "Search for exposed credentials in code repositories (WSTG-IDNT-04)"
     module: "github_dork_scope"
-    skip_if_no_api_key: true
 
   # Phase 4: Authentication Testing (WSTG-ATHN)
   - name: "Authentication Vulnerability Scanning"
@@ -161,13 +148,6 @@ steps:
       threads: 50
     depends_on: ["Web Application Fingerprinting"]
 
-  - name: "JavaScript Analysis"
-    description: "Analyze JavaScript for sensitive data and endpoints (WSTG-CLNT-01)"
-    module: "js_analysis"
-    depends_on: ["Content Discovery and Crawling"]
-    skip_if_no_tool: true
-
-  # Final: Visual Evidence Collection
   - name: "Screenshot Evidence Collection"
     description: "Capture screenshots of all discovered services"
     module: "gowitness"

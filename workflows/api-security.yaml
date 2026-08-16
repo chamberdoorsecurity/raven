@@ -20,7 +20,6 @@ steps:
     module: "nuclei"
     params:
       templates: "graphql"
-    skip_if_no_tool: true
 
   - name: "Subdomain Enumeration"
     description: "Find all API subdomains (api., rest., graphql., etc.)"
@@ -44,7 +43,6 @@ steps:
     params:
       templates: "idor"
     depends_on: ["API Endpoint Discovery"]
-    skip_if_no_tool: true
 
   ## API2:2023 - Broken Authentication
   - name: "API2 - Authentication Bypass Testing"
@@ -202,7 +200,6 @@ steps:
     description: "Identify WAF/API Gateway protection"
     module: "waf_detection"
     depends_on: ["Subdomain Enumeration"]
-    skip_if_no_tool: true
 
 # Execution Options
 options:
